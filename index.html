@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OptiPack 3D - 智能装箱系统</title>
+    <!-- Google Fonts & FontAwesome -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Main Stylesheet -->
+    <link rel="stylesheet" href="styles.css">
+    <!-- Core External Libraries via CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Top Navbar -->
+        <header class="top-navbar">
+            <div class="brand">
+                <div class="logo-icon"><i class="fa-solid fa-cube"></i></div>
+                <div class="brand-text">
+                    <div style="display: flex; align-items: center; gap: 14px;">
+                        <h1 style="margin: 0; line-height: 1;">OptiPack <span>3D</span></h1>
+                        <span style="font-size: 0.84rem; font-weight: 500; color: #cbd5e1; letter-spacing: 1.2px; padding: 2px 12px; border-left: 2px solid rgba(168, 85, 247, 0.5); border-right: 2px solid rgba(168, 85, 247, 0.5); line-height: 1;">智能装箱系统</span>
+                        <div class="luxury-badge" title="核心架构与算法设计：小裴 · AI 智能协同赋能 · Version 1.2">
+                            <span class="badge-dot"></span>
+                            <span class="badge-text">Designed by <strong style="color: #cbd5e1; font-weight: 500; font-family: inherit;">小裴</strong> <span style="margin: 0 4px; color: rgba(255,255,255,0.25);">|</span> <span style="background: linear-gradient(135deg, #c084fc, #38bdf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 600;">Powered by AI</span> &middot; Ver. 1.2</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button id="btn-tour-guide" class="btn btn-outline-cyan" style="border: 1px solid #38bdf8; color: #38bdf8; background: rgba(56, 189, 248, 0.12); box-shadow: 0 0 15px rgba(56, 189, 248, 0.25); font-weight: 600;"><i class="fa-solid fa-compass-drafting"></i> 新手导览</button>
+                <button id="btn-changelog" class="btn btn-outline-slate" style="font-weight: 500;"><i class="fa-solid fa-clock-rotate-left"></i> 更新日志</button>
+                <button id="btn-load-demo" class="btn btn-secondary"><i class="fa-solid fa-wand-magic-sparkles"></i> 加载演示数据</button>
+                <div class="excel-btn-wrapper">
+                    <button id="btn-import-excel" class="btn btn-outline-purple"><i class="fa-solid fa-file-excel"></i> Excel导入清单</button>
+                    <input type="file" id="input-excel-file" accept=".xlsx, .xls, .csv" style="display: none;" />
+                    <!-- 悬浮清单填写格式图与提示说明 -->
+                    <div id="excel-format-tooltip" class="excel-tooltip-card glass-panel">
+                        <div class="tooltip-header">
+                            <i class="fa-solid fa-circle-info text-purple"></i>
+                            <span class="tooltip-title">请按图所示格式制作清单</span>
+                        </div>
+                        <div class="tooltip-img-wrapper">
+                            <img src="src/assets/excel-template-format.png" alt="装箱清单填写格式图示" class="format-preview-img" />
+                        </div>
+                        <div class="tooltip-footer-note">
+                            <i class="fa-solid fa-lightbulb text-warning"></i> 提示：标准 Excel 需包含 <strong>型号、尺寸(长*宽*高)、数量</strong> 表头。
+                        </div>
+                    </div>
+                </div>
+                <button id="btn-optimize" class="btn btn-primary pulse"><i class="fa-solid fa-microchip"></i> 智能一键装箱优化</button>
+            </div>
+        </header>
+
+        <!-- Main Workspace -->
+        <main class="main-workspace">
+            <!-- Left Sidebar: Configuration & Items Input -->
+            <aside class="sidebar">
+                <!-- Container Setup Section -->
+                <section class="panel glass-panel">
+                    <div class="panel-header" id="toggle-container-panel" style="padding: 8px 14px;">
+                        <h2 style="font-size: 0.85rem;"><i class="fa-solid fa-truck-container"></i> 容器空间设置</h2>
+                        <i class="fa-solid fa-chevron-down toggle-icon" style="font-size: 0.8rem;"></i>
+                    </div>
+                    <div class="panel-body" style="padding: 10px 14px; gap: 8px;">
+                        <div class="form-group" style="gap: 3px;">
+                            <label for="preset-container" style="font-size: 0.7rem;">标准预设规格</label>
+                            <select id="preset-container" class="form-control" style="padding: 4px 8px; font-size: 0.8rem; height: 28px;">
+                                <option value="40HQ.SPECIAL" selected>40尺专用特殊规格 (40HQ.SPECIAL: 11.8m x 2.35m x 2.65m)</option>
+                                <option value="20GP">20尺集装箱 (20GP: 5.9m x 2.35m x 2.39m)</option>
+                                <option value="40GP">40尺集装箱 (40GP: 12.0m x 2.35m x 2.39m)</option>
+                                <option value="40HQ">40尺高柜 (40HQ: 12.0m x 2.35m x 2.70m)</option>
+                                <option value="TRUCK42">标准4.2米厢式货车 (4.2m x 2.1m x 2.1m)</option>
+                                <option value="PALLET">标准欧洲托盘 (1.2m x 0.8m x 1.5m)</option>
+                                <option value="BOX_L">大型物流周转箱 (60cm x 40cm x 35cm)</option>
+                                <option value="CUSTOM">自定义容器尺寸...</option>
+                            </select>
+                        </div>
+
+                        <div class="dimensions-grid" style="grid-template-columns: repeat(4, 1fr); gap: 6px;">
+                            <div class="form-group" style="gap: 2px;">
+                                <label style="font-size: 0.68rem;">宽度W(mm)</label>
+                                <input type="number" id="container-width" class="form-control font-mono" style="padding: 4px 6px; font-size: 0.8rem; height: 26px;" value="2350" min="100">
+                            </div>
+                            <div class="form-group" style="gap: 2px;">
+                                <label style="font-size: 0.68rem;">高度H(mm)</label>
+                                <input type="number" id="container-height" class="form-control font-mono" style="padding: 4px 6px; font-size: 0.8rem; height: 26px;" value="2650" min="100">
+                            </div>
+                            <div class="form-group" style="gap: 2px;">
+                                <label style="font-size: 0.68rem;">长度L(mm)</label>
+                                <input type="number" id="container-length" class="form-control font-mono" style="padding: 4px 6px; font-size: 0.8rem; height: 26px;" value="11800" min="100">
+                            </div>
+                            <div class="form-group" style="gap: 2px;">
+                                <label style="font-size: 0.68rem;">最大承重(kg)</label>
+                                <input type="number" id="container-max-weight" class="form-control font-mono" style="padding: 4px 6px; font-size: 0.8rem; height: 26px;" value="28800" min="1">
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Items Management Section -->
+                <section class="panel glass-panel flex-grow">
+                    <div class="panel-header" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <h2 style="margin: 0;"><i class="fa-solid fa-boxes-stacked"></i> 待装货物清单 <span id="item-count-badge" class="badge">0</span></h2>
+                            <!-- 长方体货物功能按钮 (默认打开) -->
+                            <label style="cursor: pointer; display: flex; align-items: center; gap: 5px; font-size: 0.85rem; color: #e2e8f0; font-weight: 600; background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.32); padding: 4px 10px; border-radius: 6px; white-space: nowrap; transition: all 0.2s;" title="默认原始功能，装入的货物为长方体箱子或包装件">
+                                <input type="checkbox" id="toggle-box-mode" checked style="width: 15px; height: 15px; accent-color: #38bdf8; cursor: pointer;">
+                                <i class="fa-solid fa-cube" style="color: #38bdf8;"></i> <span>长方体货物</span>
+                            </label>
+                            <!-- 圆柱体货物功能按钮 -->
+                            <label style="cursor: pointer; display: flex; align-items: center; gap: 5px; font-size: 0.85rem; color: #e2e8f0; font-weight: 600; background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.32); padding: 4px 10px; border-radius: 6px; white-space: nowrap; transition: all 0.2s;" title="装入的货物是圆柱体，只需要输入直径和长度，按照图2交互叠放。同时自动剔除易滚落的门口横放，仅允许防滚落竖放。">
+                                <input type="checkbox" id="toggle-cylinder-mode" style="width: 15px; height: 15px; accent-color: #38bdf8; cursor: pointer;">
+                                <i class="fa-solid fa-circle" style="color: #38bdf8;"></i> <span>圆柱体货物</span>
+                            </label>
+                        </div>
+                        <div class="panel-tools">
+                            <button id="btn-add-item" class="btn-icon" title="新增一行"><i class="fa-solid fa-plus"></i></button>
+                            <button id="btn-clear-items" class="btn-icon text-danger" title="清空所有"><i class="fa-solid fa-trash-can"></i></button>
+                        </div>
+                    </div>
+                    <div class="panel-body no-padding table-scroll-container">
+                        <table class="items-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 28px;">#</th>
+                                    <th style="min-width: 110px;">名称 / 色块</th>
+                                    <th id="th-dimensions" style="min-width: 180px;">尺寸 (W×H×L mm)</th>
+                                    <th style="width: 60px;">数量</th>
+                                    <th style="width: 65px;">单重</th>
+                                    <th style="width: 40px;" title="是否允许翻转/旋转">旋转</th>
+                                    <th style="width: 35px;">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="items-tbody">
+                                <!-- Dynamic rows go here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Bottom Packing Options & Reset Section -->
+                <section class="panel glass-panel" style="padding: 16px 18px; min-height: 72px; flex-shrink: 0; background: rgba(15, 23, 42, 0.85); display: flex; align-items: center;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; white-space: nowrap; gap: 8px;">
+                        <!-- 数量递减装箱 -->
+                        <label style="cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 0.92rem; color: #e2e8f0; font-weight: 600; white-space: nowrap; flex-shrink: 0;" title="超载时按照数量递减货物">
+                            <input type="checkbox" id="toggle-uniform-reduction" style="width: 17px; height: 17px; accent-color: #38bdf8; cursor: pointer;">
+                            <i class="fa-solid fa-scale-balanced" style="color: #38bdf8; font-size: 1.1rem;"></i> <span>数量递减</span>
+                        </label>
+                        <!-- 体积递减装箱 -->
+                        <label style="cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 0.92rem; color: #e2e8f0; font-weight: 600; white-space: nowrap; flex-shrink: 0;" title="超载时按照体积递减货物">
+                            <input type="checkbox" id="toggle-volume-reduction" style="width: 17px; height: 17px; accent-color: #a855f7; cursor: pointer;">
+                            <i class="fa-solid fa-cube" style="color: #a855f7; font-size: 1.1rem;"></i> <span>体积递减</span>
+                        </label>
+                        <!-- 柜门横竖填充 -->
+                        <label style="cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 0.92rem; color: #e2e8f0; font-weight: 600; white-space: nowrap; flex-shrink: 0;" title="末端及高空余量允许横向或竖向摆放（多维度立体填充）">
+                            <input type="checkbox" id="toggle-transverse-packing" checked style="width: 17px; height: 17px; accent-color: #fbbf24; cursor: pointer;">
+                            <i class="fa-solid fa-arrows-left-right" style="color: #fbbf24; font-size: 1.1rem;"></i> <span>柜门横竖填充</span>
+                        </label>
+                        <!-- 恢复默认 -->
+                        <div style="display: flex; align-items: center; flex-shrink: 0;">
+                            <button id="btn-reset-defaults-sidebar" class="btn" style="padding: 7px 14px; font-size: 0.88rem; background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.25); border-radius: 6px; color: #f8fafc; font-weight: 500; cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 6px;" title="重置所有锁定和装箱设定为默认"><i class="fa-solid fa-rotate-left"></i> <span>恢复默认</span></button>
+                        </div>
+                    </div>
+                </section>
+            </aside>
+
+            <!-- Center & Right: 3D Visualization, Stats & Controls -->
+            <section class="viewport-section">
+                <!-- Stats Dashboard Bar -->
+                <div class="stats-dashboard glass-panel" id="report-summary-area">
+                    <div class="stat-card main-stat">
+                        <div class="stat-label">总体空间利用率</div>
+                        <div class="stat-value font-mono" id="stat-utilization">0.0%</div>
+                        <div class="progress-bar-container">
+                            <div class="progress-bar" id="utilization-progress"></div>
+                        </div>
+                    </div>
+
+                    <div class="stat-divider"></div>
+
+                    <div class="stat-card">
+                        <div class="stat-label"><i class="fa-solid fa-cube text-accent"></i> 占用体积 / 总容量</div>
+                        <div class="stat-value font-mono stat-metric-value" id="stat-volume">0 / 0 m³</div>
+                    </div>
+
+                    <div class="stat-divider"></div>
+
+                    <div class="stat-card">
+                        <div class="stat-label"><i class="fa-solid fa-weight-hanging text-warning"></i> 已载重 / 最大承重</div>
+                        <div class="stat-value font-mono stat-metric-value" id="stat-weight">0 / 0 kg</div>
+                    </div>
+
+                    <div class="stat-divider"></div>
+
+                    <div class="stat-card">
+                        <div class="stat-label"><i class="fa-solid fa-check-double text-success"></i> 已装件数 / 总件数</div>
+                        <div class="stat-value font-mono stat-metric-value" id="stat-items">0 / 0</div>
+                    </div>
+
+                    <!-- Unpacked Overflow Warning Toast -->
+                    <div id="overflow-toast" class="overflow-toast glass-panel hidden">
+                        <i class="fa-solid fa-triangle-exclamation text-warning"></i>
+                        <span>空间/承重不足，有 <strong id="overflow-count">0</strong> 件物品未能装入当前容器！</span>
+                    </div>
+
+                    <!-- Fully Packed Success Toast -->
+                    <div id="success-toast" class="success-toast glass-panel hidden">
+                        <i class="fa-solid fa-circle-check text-success" style="font-size: 1.05rem;"></i>
+                        <span>完美匹配：当前清单所有 <strong id="success-count" style="color: var(--success-color);">0</strong> 件货物已经全部装入！</span>
+                    </div>
+                </div>
+
+                <!-- 3D Canvas Viewport -->
+                <div class="canvas-wrapper glass-panel" id="print-capture-area">
+                    <div id="canvas-container"></div>
+                    
+                    <!-- Viewport Overlay Controls & Legends -->
+                    <div class="viewport-overlay-top">
+                        <div class="view-mode-controls">
+                            <button class="btn-view active" data-view="isometric"><i class="fa-solid fa-cube"></i> 透视轴测</button>
+                            <button class="btn-view" data-view="top"><i class="fa-solid fa-arrow-down"></i> 顶视图</button>
+                            <button class="btn-view" data-view="side"><i class="fa-solid fa-arrow-right"></i> 侧视图</button>
+                            <button class="btn-view" data-view="front"><i class="fa-solid fa-arrow-up"></i> 正视图</button>
+                        </div>
+                        <div class="wireframe-toggle">
+                            <label class="switch-label">
+                                <input type="checkbox" id="toggle-wireframe" checked>
+                                <span>容器外框</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Floating Item Hover Tooltip -->
+                    <div id="item-tooltip" class="floating-tooltip glass-panel hidden">
+                        <div class="tooltip-header">
+                            <span id="tooltip-color-indicator" class="color-dot"></span>
+                            <strong id="tooltip-title">货物名称</strong>
+                        </div>
+                        <div class="tooltip-body font-mono">
+                            <div>装箱序号: <span id="tooltip-step" class="text-accent">#1</span></div>
+                            <div>规格尺寸: <span id="tooltip-dim">100x100x100 mm</span></div>
+                            <div>单件重量: <span id="tooltip-weight">10 kg</span></div>
+                            <div>摆放坐标: <span id="tooltip-coord">(0, 0, 0)</span></div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Bottom Simulation Animation Player & Export Toolbar -->
+                <div class="player-toolbar glass-panel">
+                    <div class="player-controls">
+                        <button id="btn-step-prev" class="btn-player" title="上一步"><i class="fa-solid fa-backward-step"></i></button>
+                        <button id="btn-play-pause" class="btn-player btn-play-main" title="播放 / 暂停"><i class="fa-solid fa-play"></i></button>
+                        <button id="btn-step-next" class="btn-player" title="下一步"><i class="fa-solid fa-forward-step"></i></button>
+                        <button id="btn-reset-view" class="btn-player text-sm" title="重新开始"><i class="fa-solid fa-rotate-left"></i></button>
+                    </div>
+
+                    <div class="slider-container">
+                        <span class="font-mono text-xs">步骤</span>
+                        <input type="range" id="animation-slider" min="0" max="0" value="0" disabled>
+                        <span id="step-counter" class="font-mono text-xs step-badge">0 / 0</span>
+                    </div>
+
+                    <div class="speed-control">
+                        <label for="playback-speed"><i class="fa-solid fa-gauge"></i></label>
+                        <select id="playback-speed" class="form-control text-xs font-mono">
+                            <option value="2000">0.5x 慢速</option>
+                            <option value="1000" selected>1.0x 正常</option>
+                            <option value="500">2.0x 快速</option>
+                            <option value="200">5.0x 极速</option>
+                        </select>
+                    </div>
+
+                    <div class="toolbar-divider"></div>
+
+                    <div class="export-actions">
+                        <button id="btn-show-manifest" class="btn btn-outline-accent text-xs"><i class="fa-solid fa-list-check"></i> 查看放入/未放入清单</button>
+                        <button id="btn-export-excel" class="btn btn-outline-success text-xs"><i class="fa-solid fa-file-excel"></i> 导出Excel明细</button>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Packing Manifest Modal Dialog -->
+    <div id="manifest-modal" class="modal-overlay hidden">
+        <div class="modal-content glass-panel">
+            <div class="modal-header">
+                <h3 style="font-size:1.1rem; margin-right: auto;"><i class="fa-solid fa-clipboard-list text-accent"></i> 装箱作业明细清单报表</h3>
+                <div class="modal-tabs" style="padding: 0; background: transparent; border: none; margin-right: 20px;">
+                    <button class="tab-btn active" data-tab="packed">📊 各尺寸规格装箱详单 (共 <span id="modal-packed-cnt">0</span> 种尺寸)</button>
+                    <button class="tab-btn" data-tab="unpacked">❌ 未放入/剩余汇总 (<span id="modal-unpacked-cnt">0</span> 件)</button>
+                </div>
+                <button id="btn-close-modal" class="btn-icon" style="font-size:1.2rem;"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <div id="tab-packed" class="tab-pane active">
+                    <table class="manifest-table">
+                        <thead>
+                            <tr><th>序号</th><th>颜色</th><th>物品名称</th><th>单件尺寸 (W×H×L) mm</th><th>单重 (kg)</th><th>应装总数</th><th style="color:#10b981;">放入件数(a) (精准锁定)</th><th style="color:#ef4444;">未放件数(b)</th><th>装载状态</th></tr>
+                        </thead>
+                        <tbody id="packed-tbody"></tbody>
+                    </table>
+                </div>
+                <div id="tab-unpacked" class="tab-pane hidden">
+                    <table class="manifest-table">
+                        <thead>
+                            <tr><th>序号</th><th>物品名称</th><th>单件尺寸 (W×H×L) mm</th><th>单重 (kg)</th><th>未放入总件数</th><th>原因 / 状态说明</th></tr>
+                        </thead>
+                        <tbody id="unpacked-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer" style="padding: 12px 20px; border-top: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; background: rgba(15, 23, 42, 0.8); border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;">
+                <div style="font-size: 0.85rem; color: #94a3b8; display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-lock text-accent" style="font-size: 1rem;"></i>
+                    <span>随意加减**放入件数(a)**后，该物品将被锁定剔除削减权重，完成独立的精准个数装箱</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <button id="btn-reset-defaults-modal" class="btn" style="padding: 8px 16px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #e2e8f0; cursor: pointer;"><i class="fa-solid fa-rotate-left"></i> 恢复默认</button>
+                    <button id="btn-repack-modal" class="btn btn-primary font-bold" style="padding: 8px 20px; box-shadow: 0 4px 12px rgba(56, 189, 248, 0.3);">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> 确定修改并重新智能装箱
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- System Changelog Modal Dialog -->
+    <div id="changelog-modal" class="modal-overlay hidden">
+        <div class="modal-content glass-panel" style="width: 860px; max-height: 85vh;">
+            <div class="modal-header">
+                <h3 style="font-size:1.15rem; color: #f8fafc; display: flex; align-items: center; gap: 10px;">
+                    <i class="fa-solid fa-clock-rotate-left" style="color: #c084fc;"></i> 系统版本迭代历史与功能更新日志
+                </h3>
+                <button id="btn-close-changelog" class="btn-icon" style="font-size:1.25rem;"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body" style="padding: 24px 30px;">
+                <div class="changelog-timeline">
+                    <!-- Ver 1.2 Card -->
+                    <div class="changelog-card latest">
+                        <div class="changelog-dot"></div>
+                        <div class="changelog-header">
+                            <div class="changelog-version">
+                                <span>Ver. 1.2</span>
+                                <span class="changelog-tag latest-tag">最新重大迭代</span>
+                            </div>
+                            <span class="changelog-date">2026.07.13</span>
+                        </div>
+                        <ul class="cl-streamlined-list">
+                            <li class="cl-item-row">
+                                <span class="cl-tag tag-purple">双态隔离</span>
+                                <div class="cl-item-text"><strong>“长方体 / 圆柱体”独立双引擎架构</strong>：二者算法互不干涉，一键顺畅切换，无冗余提示框阻断。</div>
+                            </li>
+                            <li class="cl-item-row">
+                                <span class="cl-tag tag-accent">物理沉降</span>
+                                <div class="cl-item-text"><strong>重力滚落与相邻“稳固巢点”自适应沉降</strong>：圆柱体沿下层弧面滑入倒三角低谷 (Saddle Point)，大幅压缩总高、向上释放空间。</div>
+                            </li>
+                            <li class="cl-item-row">
+                                <span class="cl-tag tag-success">安全规范</span>
+                                <div class="cl-item-text"><strong>门后及高空空间“防滚落严格竖放”规则</strong>：底层交错铺满后，剩余空间禁绝横放，仅允许垂直地面的安全竖放，杜绝滚落。</div>
+                            </li>
+                            <li class="cl-item-row">
+                                <span class="cl-tag tag-cyan">报表图纸</span>
+                                <div class="cl-item-text"><strong>Excel 与平面图例精确加注</strong>：顺向交错放置默认保持纯净，仅对防滚落<strong>竖放</strong>的圆柱体在表单与图中精准标注 <code style="background: rgba(255,255,255,0.15); color: #f8fafc; padding: 1px 5px; border-radius: 3px; font-family: monospace;">“竖”</code> 字。</div>
+                            </li>
+                            <li class="cl-item-row">
+                                <span class="cl-tag tag-warning">系统升级</span>
+                                <div class="cl-item-text"><strong>更新日志专栏与向导迭代</strong>：菜单栏新增低调灰更新专栏，Spotlight 互动向导同步扩容至 10 步指引。</div>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <!-- Ver 1.1 Card -->
+                    <div class="changelog-card">
+                        <div class="changelog-dot"></div>
+                        <div class="changelog-header">
+                            <div class="changelog-version">
+                                <span>Ver. 1.1</span>
+                                <span class="changelog-tag">体验增强与二进位策略</span>
+                            </div>
+                            <span class="changelog-date">2026.07.02</span>
+                        </div>
+                        <ul class="cl-streamlined-list">
+                            <li class="cl-item-row">
+                                <span class="cl-tag tag-cyan">表格排版</span>
+                                <div class="cl-item-text"><strong>表头字段重排适配现场</strong>：主表及导出的 Excel 详单中“单重 (kg)”移至“数量”之后，核对数据更直观。</div>
+                            </li>
+                            <li class="cl-item-row">
+                                <span class="cl-tag tag-warning">组合策略</span>
+                                <div class="cl-item-text"><strong>新增“柜门横竖智能填充”组合开关</strong>：长方体横向排满后自动二次遍历，最长边竖起填充门后与顶层余量。</div>
+                            </li>
+                            <li class="cl-item-row">
+                                <span class="cl-tag tag-accent">互动向导</span>
+                                <div class="cl-item-text"><strong>内置 Spotlight 分步导览系统</strong>：手把手高亮指引集装箱设置、报表解析导入及 3D 多视角锁单交互。</div>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <!-- Ver 1.0 Card -->
+                    <div class="changelog-card">
+                        <div class="changelog-dot"></div>
+                        <div class="changelog-header">
+                            <div class="changelog-version">
+                                <span>Ver. 1.0</span>
+                                <span class="changelog-tag">系统发布</span>
+                            </div>
+                            <span class="changelog-date">2026.06.25</span>
+                        </div>
+                        <ul class="cl-streamlined-list">
+                            <li class="cl-item-row">
+                                <span class="cl-tag tag-purple">运筹底层</span>
+                                <div class="cl-item-text"><strong>三维多切片多规格混合装箱引擎</strong>：支持任意非标尺寸自定义，并内置 12 种国际标准集装箱与厢车。</div>
+                            </li>
+                            <li class="cl-item-row">
+                                <span class="cl-tag tag-success">超载平衡</span>
+                                <div class="cl-item-text"><strong>双模式智能超载权衡推荐</strong>：超重或超积时，支持“数量优先 / 体积优先”按比例自动削减与配载权衡。</div>
+                            </li>
+                            <li class="cl-item-row">
+                                <span class="cl-tag tag-cyan">3D 视觉</span>
+                                <div class="cl-item-text"><strong>Three.js 全景渲染舱与回放</strong>：支持 360° 旋转观察、底部进度条逐件快进快退回放及包裹参数提示卡。</div>
+                            </li>
+                            <li class="cl-item-row">
+                                <span class="cl-tag tag-accent">报表图纸</span>
+                                <div class="cl-item-text"><strong>一键导出物流详表与平面图</strong>：快速生成含 3D 坐标的 Excel 详单，并绘制带颜色及标尺的平面俯视施工图。</div>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Application Script Modules -->
+    <script src="src/algorithm/binPacking.js?v=20260713_VER1_2"></script>
+    <script src="src/viewer/scene3d.js?v=20260713_VER1_2"></script>
+    <script src="src/utils/fileHandler.js?v=20260713_VER1_2"></script>
+    <script src="src/utils/tourGuide.js?v=20260713_VER1_2"></script>
+    <script src="src/app.js?v=20260713_VER1_2"></script>
+</body>
+</html>
